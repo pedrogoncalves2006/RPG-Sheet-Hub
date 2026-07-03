@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Mesa — Organizador de Fichas</title>
+<style>
+  :root{
+    --ink:#1c2321;
+    --panel:#232b28;
+    --panel-2:#2b3430;
+    --line:#3a453f;
+    --paper:#ece2c8;
+    --paper-dark:#ddd0a8;
+    --ink-text:#221d15;
+    --bone:#d9d2bd;
+    --bone-dim:#8f9a90;
+    --moss:#7a9b6e;
+    --brass:#c19a4b;
+    --rust:#a2492f;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--ink); color:var(--bone);
+    font-family:Georgia,'Iowan Old Style','Times New Roman',serif;
+    min-height:100vh;
+  }
+  ::selection{background:var(--brass); color:var(--ink-text);}
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.05;
+    background-image:radial-gradient(var(--bone) .6px, transparent .6px);
+    background-size:3px 3px;
+  }
+  .app{display:flex; min-height:100vh; position:relative; z-index:1;}
+  .spine{width:230px; flex:0 0 230px; background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column;}
+  .spine-head{padding:26px 20px 18px 20px; border-bottom:1px solid var(--line);}
+  .spine-head .mark{
+    width:34px; height:34px; border-radius:50%; border:2px solid var(--brass);
+    display:flex; align-items:center; justify-content:center; font-size:1.1rem; color:var(--brass); margin-bottom:10px;
+  }
+  .spine-head h1{margin:0; font-size:1.15rem; letter-spacing:.3px; color:var(--bone); font-weight:400;}
+  .spine-head p{margin:4px 0 0 0; font-size:.72rem; color:var(--bone-dim); letter-spacing:.5px;}
+  #status{font-size:.68rem; color:var(--bone-dim); margin-top:10px; display:flex; align-items:center; gap:6px;}
+  #status .dot{width:6px; height:6px; border-radius:50%; background:var(--bone-dim); display:inline-block;}
+  #status.on .dot{background:var(--moss);}
+  #status.off .dot{background:var(--rust);}
+  .tabs{display:flex; flex-direction:column; padding:14px 0; flex:1;}
+  .tabs button{
+    all:unset; cursor:pointer; padding:13px 20px; font-size:.86rem; color:var(--bone-dim);
+    border-left:3px solid transparent; font-family:inherit; letter-spacing:.2px; display:flex; align-items:center; gap:10px;
+  }
+  .tabs button:hover{color:var(--bone); background:rgba(255,255,255,.03);}
+  .tabs button.active{color:var(--brass); border-left-color:var(--brass); background:rgba(193,154,75,.08); font-weight:600;}
+  .tabs button .ico{font-size:1rem; width:18px; text-align:center;}
+  .spine-foot{padding:16px 20px; border-top:1px solid var(--line); font-size:.68rem; color:var(--bone-dim); line-height:1.5;}
+  main{flex:1; padding:34px 40px; max-width:1180px;}
+  h2.titulo{font-size:1.4rem; font-weight:400; color:var(--bone); margin:0 0 4px 0; letter-spacing:.2px;}
+  p.sub{color:var(--bone-dim); margin:0 0 22px 0; font-size:.88rem;}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; align-items:center;}
+  input,select,textarea{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--bone);
+    padding:9px 12px; border-radius:var(--radius); font-size:.88rem; font-family:'Courier New',ui-monospace,monospace;
+  }
+  input:focus,select:focus,textarea:focus{outline:none; border-color:var(--brass);}
+  ::placeholder{color:var(--bone-dim);}
+  .btn{
+    background:var(--brass); color:#241d0f; border:none; padding:10px 18px; border-radius:var(--radius);
+    cursor:pointer; font-weight:700; font-size:.82rem; letter-spacing:.4px; text-transform:uppercase; font-family:'Courier New',ui-monospace,monospace;
+  }
+  .btn:hover{filter:brightness(1.08);}
+  .btn.secondary{background:transparent; color:var(--bone); border:1px solid var(--line);}
+  .btn.secondary:hover{border-color:var(--bone-dim);}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px;}
+  .card{
+    background:var(--paper); color:var(--ink-text); border-radius:2px; padding:18px 18px 16px 18px;
+    display:flex; flex-direction:column; gap:6px; position:relative;
+    box-shadow:0 3px 0 rgba(0,0,0,.25), 0 8px 18px rgba(0,0,0,.25);
+  }
+  .card::after{
+    content:""; position:absolute; top:0; right:0; width:0; height:0;
+    border-style:solid; border-width:0 16px 16px 0; border-color:transparent var(--paper-dark) transparent transparent;
+  }
+  .card h3{margin:2px 0 2px 0; font-size:1.02rem; font-weight:700; color:var(--ink-text);}
+  .tag{
+    display:inline-block; background:var(--ink); color:var(--brass); font-size:.65rem; letter-spacing:.4px;
+    text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-right:4px; width:fit-content; font-family:'Courier New',ui-monospace,monospace;
+  }
+  .card .meta{font-size:.78rem; color:#4c4534; font-family:'Courier New',ui-monospace,monospace;}
+  .card .actions{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
+  .card .actions button{
+    flex:1; font-size:.72rem; padding:7px 6px; background:rgba(0,0,0,.06); border:1px solid rgba(0,0,0,.15);
+    color:var(--ink-text); border-radius:2px; cursor:pointer; font-family:'Courier New',ui-monospace,monospace;
+  }
+  .card .actions button:hover{background:var(--ink); color:var(--brass); border-color:var(--ink);}
+  .empty{
+    color:var(--bone-dim); text-align:center; padding:60px 20px; font-style:italic; border:1px dashed var(--line);
+    border-radius:4px; grid-column:1/-1;
+  }
+  .overlay{
+    display:none; position:fixed; inset:0; background:rgba(10,12,10,.72); align-items:flex-start;
+    justify-content:center; padding:40px 16px; overflow-y:auto; z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .modal{background:var(--paper); color:var(--ink-text); border-radius:3px; padding:28px; width:100%; max-width:640px; position:relative;}
+  .modal h2{margin-top:0; color:var(--ink-text); font-weight:700; border-bottom:2px solid var(--ink); padding-bottom:10px;}
+  .field{margin-bottom:14px; display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:.72rem; color:#5a5340; text-transform:uppercase; letter-spacing:.4px; font-family:'Courier New',ui-monospace,monospace;}
+  .field input, .field select, .field textarea{width:100%; background:#fbf6e8; color:var(--ink-text); border:1px solid #c9bd97;}
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--ink);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:18px;}
+  .attr-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .attr-box{background:#fbf6e8; border:1px solid #c9bd97; border-radius:2px; padding:8px; text-align:center;}
+  .attr-box label{font-size:.66rem; color:#5a5340; display:block; margin-bottom:4px; text-transform:uppercase;}
+  .attr-box input{width:100%; text-align:center; border:none; background:transparent; padding:2px;}
+  .close-x{position:absolute; top:14px; right:16px; cursor:pointer; color:#5a5340; font-size:1.2rem; line-height:1;}
+  .close-x:hover{color:var(--rust);}
+  .system-badge{
+    background:var(--moss); color:#12190f; font-size:.65rem; text-transform:uppercase; letter-spacing:.4px;
+    padding:3px 9px; border-radius:20px; width:fit-content; font-family:'Courier New',ui-monospace,monospace; font-weight:700;
+  }
+  footer{text-align:center; padding:30px; color:var(--bone-dim); font-size:.72rem;}
+  @media (max-width: 800px){
+    .app{flex-direction:column;}
+    .spine{width:100%; flex:none;}
+    .tabs{flex-direction:row; overflow-x:auto;}
+    .tabs button{border-left:none; border-bottom:3px solid transparent; white-space:nowrap;}
+    .tabs button.active{border-left-color:transparent; border-bottom-color:var(--brass);}
+    main{padding:22px 18px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="spine">
+    <div class="spine-head">
+      <div class="mark">⚄</div>
+      <h1>A Mesa</h1>
+      <p>fichas &amp; materiais do grupo</p>
+      <div id="status"><span class="dot"></span><span id="statusTxt">conectando…</span></div>
+    </div>
+    <nav class="tabs">
+      <button class="active" data-view="fichas"><span class="ico">☰</span>Fichas</button>
+      <button data-view="arquivos"><span class="ico">⌂</span>PDFs e arquivos</button>
+      <button data-view="nova"><span class="ico">✎</span>Nova ficha</button>
+      <button data-view="branco"><span class="ico">▢</span>Ficha em branco</button>
+    </nav>
+    <div class="spine-foot">Guardado neste computador,<br>visível para todo mundo na mesma rede.</div>
+  </aside>
+
+<main>
+
+  <!-- VIEW: LISTA DE FICHAS -->
+  <section id="view-fichas">
+    <h2 class="titulo">Fichas</h2>
+    <p class="sub">Todos os personagens do grupo, num só lugar.</p>
+    <div class="toolbar">
+      <input id="buscaFicha" placeholder="Buscar por nome, jogador ou sistema...">
+      <select id="filtroSistema"><option value="">Todos os sistemas</option></select>
+      <button class="btn" onclick="renderFichas()">Buscar</button>
+    </div>
+    <div id="listaFichas" class="grid"></div>
+  </section>
+
+  <!-- VIEW: ARQUIVOS -->
+  <section id="view-arquivos" style="display:none">
+    <h2 class="titulo">PDFs e arquivos</h2>
+    <p class="sub">Livros de regras, mapas, aventuras — o que o grupo precisa consultar.</p>
+    <div class="toolbar">
+      <button class="btn" onclick="abrirUpload()">Enviar arquivo</button>
+      <input id="buscaArquivo" placeholder="Buscar arquivos...">
+    </div>
+    <div id="listaArquivos" class="grid"></div>
+  </section>
+
+  <!-- VIEW: NOVA FICHA (formulário completo) -->
+  <section id="view-nova" style="display:none">
+    <h2 class="titulo">Nova ficha</h2>
+    <p class="sub">Vale para qualquer sistema — deixe em branco o que não usar.</p>
+    <form id="formFicha" onsubmit="salvarFicha(event)">
+      <div class="row2">
+        <div class="field"><label>Nome do personagem *</label><input id="f_nome" required></div>
+        <div class="field"><label>Nome do jogador</label><input id="f_jogador"></div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Sistema de RPG *</label>
+          <input id="f_sistema" list="listaSistemas" placeholder="D&D 5e, Tormenta20, GURPS..." required>
+          <datalist id="listaSistemas"></datalist>
+        </div>
+        <div class="field"><label>Classe / Arquétipo / Origem</label><input id="f_classe"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Nível / Rank</label><input id="f_nivel"></div>
+        <div class="field"><label>Raça / Linhagem</label><input id="f_raca"></div>
+      </div>
+
+      <div class="field">
+        <label>Atributos (deixe em branco se não usar)</label>
+        <div class="attr-grid">
+          <div class="attr-box"><label>FOR</label><input id="a_for"></div>
+          <div class="attr-box"><label>DES</label><input id="a_des"></div>
+          <div class="attr-box"><label>CON</label><input id="a_con"></div>
+          <div class="attr-box"><label>INT</label><input id="a_int"></div>
+          <div class="attr-box"><label>SAB</label><input id="a_sab"></div>
+          <div class="attr-box"><label>CAR</label><input id="a_car"></div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field"><label>PV / HP</label><input id="f_pv"></div>
+        <div class="field"><label>PM / Mana / Recurso especial</label><input id="f_pm"></div>
+      </div>
+
+      <div class="field"><label>Equipamentos e Itens</label><textarea id="f_itens" rows="3"></textarea></div>
+      <div class="field"><label>Perícias / Talentos / Habilidades</label><textarea id="f_habilidades" rows="3"></textarea></div>
+      <div class="field"><label>História / Anotações do mestre</label><textarea id="f_notas" rows="4"></textarea></div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" onclick="mudarView('fichas')">Cancelar</button>
+        <button type="submit" class="btn">Salvar ficha</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- VIEW: GERAR FICHA EM BRANCO -->
+  <section id="view-branco" style="display:none">
+    <h2 class="titulo">Ficha em branco</h2>
+    <p class="sub">Escolha um modelo. Ele abre numa aba pronta para imprimir ou salvar como PDF.</p>
+    <div class="grid">
+      <div class="card">
+        <span class="tag">universal</span>
+        <h3>Ficha genérica</h3>
+        <p class="meta">Atributos, PV, itens e história. Serve pra qualquer sistema.</p>
+        <button class="btn" onclick="gerarBranco('generica')" style="margin-top:8px">Gerar</button>
+      </div>
+      <div class="card">
+        <span class="tag">D20</span>
+        <h3>D&amp;D / Tormenta</h3>
+        <p class="meta">Atributos, classe, nível, perícias e magias.</p>
+        <button class="btn" onclick="gerarBranco('d20')" style="margin-top:8px">Gerar</button>
+      </div>
+      <div class="card">
+        <span class="tag">narrativa</span>
+        <h3>FATE / Vampiro e afins</h3>
+        <p class="meta">Aspectos, traços, recursos e espaço livre.</p>
+        <button class="btn" onclick="gerarBranco('narrativa')" style="margin-top:8px">Gerar</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<footer>A Mesa — roda inteiramente na sua rede local, sem precisar de internet.</footer>
+
+<!-- MODAL: detalhe da ficha -->
+<div class="overlay" id="modalDetalhe">
+  <div class="modal">
+    <span class="close-x" onclick="fecharModal('modalDetalhe')">✕</span>
+    <div id="detalheConteudo"></div>
+  </div>
+</div>
+
+<!-- MODAL: upload de arquivo -->
+<div class="overlay" id="modalUpload">
+  <div class="modal">
+    <span class="close-x" onclick="fecharModal('modalUpload')">✕</span>
+    <h2>Enviar arquivo</h2>
+    <form id="formUpload" onsubmit="enviarArquivo(event)">
+      <div class="field">
+        <label>Arquivo (PDF, imagem, etc.)</label>
+        <input type="file" id="up_arquivo" required>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Sistema relacionado</label><input id="up_sistema"></div>
+        <div class="field">
+          <label>Categoria</label>
+          <select id="up_categoria">
+            <option value="livro">Livro de regras</option>
+            <option value="ficha">Modelo de ficha</option>
+            <option value="mapa">Mapa</option>
+            <option value="aventura">Aventura / Módulo</option>
+            <option value="outro" selected>Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Vincular a uma ficha (opcional)</label>
+        <select id="up_ficha"><option value="">Nenhuma</option></select>
+      </div>
+      <div class="field"><label>Descrição</label><textarea id="up_descricao" rows="2"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" onclick="fecharModal('modalUpload')">Cancelar</button>
+        <button type="submit" class="btn">Enviar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const API = '';
+let fichas = [];
+let arquivos = [];
+
+async function api(path, opts){
+  const res = await fetch(API + path, opts);
+  if(!res.ok){ throw new Error('Erro na requisição: ' + res.status); }
+  return res.json();
+}
+
+async function carregarTudo(){
+  const statusEl = document.getElementById('status');
+  const statusTxt = document.getElementById('statusTxt');
+  try{
+    fichas = await api('/api/fichas');
+    arquivos = await api('/api/arquivos');
+    statusEl.className = 'on';
+    statusTxt.textContent = 'conectado';
+    renderFichas();
+    renderArquivos();
+    atualizarSistemas();
+  }catch(e){
+    statusEl.className = 'off';
+    statusTxt.textContent = 'sem conexão';
+  }
+}
+
+function mudarView(v){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`nav button[data-view="${v}"]`).classList.add('active');
+  ['fichas','arquivos','nova','branco'].forEach(id=>{
+    document.getElementById('view-'+id).style.display = (id===v)?'block':'none';
+  });
+  if(v==='nova'){ document.getElementById('formFicha').reset(); }
+}
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('click', ()=>mudarView(b.dataset.view));
+});
+
+function atualizarSistemas(){
+  const sistemas = [...new Set(fichas.map(f=>f.sistema).filter(Boolean))];
+  const dl = document.getElementById('listaSistemas');
+  dl.innerHTML = sistemas.map(s=>`<option value="${s}">`).join('');
+  const filtro = document.getElementById('filtroSistema');
+  filtro.innerHTML = '<option value="">Todos os sistemas</option>' +
+    sistemas.map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  const upFicha = document.getElementById('up_ficha');
+  upFicha.innerHTML = '<option value="">Nenhuma</option>' +
+    fichas.map(f=>`<option value="${f.id}">${f.nome} (${f.sistema||'?'})</option>`).join('');
+}
+
+function renderFichas(){
+  const termo = document.getElementById('buscaFicha').value.toLowerCase();
+  const sis = document.getElementById('filtroSistema').value;
+  const el = document.getElementById('listaFichas');
+  const lista = fichas.filter(f=>{
+    const t = `${f.nome} ${f.jogador||''} ${f.sistema||''}`.toLowerCase();
+    return t.includes(termo) && (sis==='' || f.sistema===sis);
+  });
+  if(lista.length===0){ el.innerHTML = '<div class="empty">Nenhuma ficha por aqui ainda. Crie uma nova ou gere uma em branco.</div>'; return; }
+  el.innerHTML = lista.map(f=>`
+    <div class="card">
+      <span class="system-badge">${f.sistema||'sem sistema'}</span>
+      <h3>${f.nome}</h3>
+      <div class="meta">Jogador: ${f.jogador||'—'}</div>
+      <div class="meta">${f.classe||''} ${f.nivel? '· Nível '+f.nivel:''}</div>
+      <div class="meta">${f.pv? 'PV '+f.pv:''} ${f.pm? '· '+f.pm:''}</div>
+      <div class="actions">
+        <button onclick="verFicha('${f.id}')">Ver</button>
+        <button onclick="editarFicha('${f.id}')">Editar</button>
+        <button onclick="excluirFicha('${f.id}')">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+document.getElementById('buscaFicha').addEventListener('input', renderFichas);
+document.getElementById('filtroSistema').addEventListener('change', renderFichas);
+
+function verFicha(id){
+  const f = fichas.find(x=>x.id===id);
+  if(!f) return;
+  const arqs = arquivos.filter(a=>a.ficha_id===id);
+  document.getElementById('detalheConteudo').innerHTML = `
+    <h2>${f.nome}</h2>
+    <span class="system-badge">${f.sistema||'sem sistema'}</span>
+    <p class="meta">Jogador: ${f.jogador||'—'} · ${f.classe||''} ${f.raca? '· '+f.raca:''} ${f.nivel? '· Nível '+f.nivel:''}</p>
+    <p><b>Atributos:</b> FOR ${f.a_for||'-'} · DES ${f.a_des||'-'} · CON ${f.a_con||'-'} · INT ${f.a_int||'-'} · SAB ${f.a_sab||'-'} · CAR ${f.a_car||'-'}</p>
+    <p><b>PV:</b> ${f.pv||'-'} &nbsp; <b>PM/Recurso:</b> ${f.pm||'-'}</p>
+    <p><b>Itens:</b><br>${(f.itens||'—').replace(/\n/g,'<br>')}</p>
+    <p><b>Habilidades:</b><br>${(f.habilidades||'—').replace(/\n/g,'<br>')}</p>
+    <p><b>Notas:</b><br>${(f.notas||'—').replace(/\n/g,'<br>')}</p>
+    <p><b>Arquivos vinculados:</b><br>${arqs.length? arqs.map(a=>`<a href="/uploads/${a.arquivo}" target="_blank" style="color:var(--accent)">${a.nome_original}</a>`).join('<br>') : 'nenhum'}</p>
+    <div class="modal-actions"><button class="btn secondary" onclick="fecharModal('modalDetalhe')">Fechar</button></div>
+  `;
+  document.getElementById('modalDetalhe').classList.add('show');
+}
+
+function editarFicha(id){
+  const f = fichas.find(x=>x.id===id);
+  if(!f) return;
+  mudarView('nova');
+  document.getElementById('formFicha').dataset.editId = id;
+  f_nome.value=f.nome||''; f_jogador.value=f.jogador||''; f_sistema.value=f.sistema||'';
+  f_classe.value=f.classe||''; f_nivel.value=f.nivel||''; f_raca.value=f.raca||'';
+  a_for.value=f.a_for||''; a_des.value=f.a_des||''; a_con.value=f.a_con||'';
+  a_int.value=f.a_int||''; a_sab.value=f.a_sab||''; a_car.value=f.a_car||'';
+  f_pv.value=f.pv||''; f_pm.value=f.pm||''; f_itens.value=f.itens||'';
+  f_habilidades.value=f.habilidades||''; f_notas.value=f.notas||'';
+}
+
+async function excluirFicha(id){
+  if(!confirm('Excluir esta ficha? Essa ação não pode ser desfeita.')) return;
+  await api('/api/fichas/'+id, {method:'DELETE'});
+  await carregarTudo();
+}
+
+async function salvarFicha(ev){
+  ev.preventDefault();
+  const dados = {
+    nome:f_nome.value, jogador:f_jogador.value, sistema:f_sistema.value,
+    classe:f_classe.value, nivel:f_nivel.value, raca:f_raca.value,
+    a_for:a_for.value, a_des:a_des.value, a_con:a_con.value,
+    a_int:a_int.value, a_sab:a_sab.value, a_car:a_car.value,
+    pv:f_pv.value, pm:f_pm.value, itens:f_itens.value,
+    habilidades:f_habilidades.value, notas:f_notas.value
+  };
+  const editId = document.getElementById('formFicha').dataset.editId;
+  if(editId){
+    await api('/api/fichas/'+editId, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)});
+    delete document.getElementById('formFicha').dataset.editId;
+  } else {
+    await api('/api/fichas', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)});
+  }
+  document.getElementById('formFicha').reset();
+  await carregarTudo();
+  mudarView('fichas');
+}
+
+// -------- ARQUIVOS --------
+function renderArquivos(){
+  const termo = document.getElementById('buscaArquivo').value.toLowerCase();
+  const el = document.getElementById('listaArquivos');
+  const lista = arquivos.filter(a=>`${a.nome_original} ${a.sistema||''} ${a.categoria||''}`.toLowerCase().includes(termo));
+  if(lista.length===0){ el.innerHTML = '<div class="empty">Nenhum arquivo enviado ainda.</div>'; return; }
+  el.innerHTML = lista.map(a=>{
+    const ficha = fichas.find(f=>f.id===a.ficha_id);
+    return `
+    <div class="card">
+      <span class="tag">${a.categoria}</span>
+      <h3>${a.nome_original}</h3>
+      <div class="meta">${a.sistema? 'Sistema: '+a.sistema : ''}</div>
+      <div class="meta">${ficha? 'Ficha: '+ficha.nome : ''}</div>
+      <div class="meta">${a.descricao||''}</div>
+      <div class="actions">
+        <a href="/uploads/${a.arquivo}" target="_blank"><button style="width:100%">Abrir</button></a>
+        <button onclick="excluirArquivo('${a.id}')">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+document.getElementById('buscaArquivo').addEventListener('input', renderArquivos);
+
+function abrirUpload(){
+  document.getElementById('formUpload').reset();
+  document.getElementById('modalUpload').classList.add('show');
+}
+function fecharModal(id){ document.getElementById(id).classList.remove('show'); }
+
+async function enviarArquivo(ev){
+  ev.preventDefault();
+  const fd = new FormData();
+  fd.append('arquivo', up_arquivo.files[0]);
+  fd.append('sistema', up_sistema.value);
+  fd.append('categoria', up_categoria.value);
+  fd.append('ficha_id', up_ficha.value);
+  fd.append('descricao', up_descricao.value);
+  await fetch('/api/upload', {method:'POST', body:fd});
+  fecharModal('modalUpload');
+  await carregarTudo();
+  mudarView('arquivos');
+}
+
+async function excluirArquivo(id){
+  if(!confirm('Excluir este arquivo?')) return;
+  await api('/api/arquivos/'+id, {method:'DELETE'});
+  await carregarTudo();
+}
+
+// -------- GERAR FICHA EM BRANCO (abre em nova aba, pronta pra imprimir) --------
+function gerarBranco(tipo){
+  const win = window.open('', '_blank');
+  let corpo = '';
+  if(tipo==='generica'){
+    corpo = `
+      <h1>Ficha de Personagem</h1>
+      <p>Nome: ____________________  Jogador: ____________________</p>
+      <p>Sistema: __________________  Nível: _______</p>
+      <h3>Atributos</h3>
+      <table><tr><th>FOR</th><th>DES</th><th>CON</th><th>INT</th><th>SAB</th><th>CAR</th></tr>
+      <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>
+      <p>PV: ______  PM/Recurso: ______</p>
+      <h3>Itens e Equipamentos</h3><div class="linhas"></div>
+      <h3>Perícias e Habilidades</h3><div class="linhas"></div>
+      <h3>História / Anotações</h3><div class="linhas grande"></div>`;
+  } else if(tipo==='d20'){
+    corpo = `
+      <h1>Ficha D20 (D&D / Tormenta / similares)</h1>
+      <p>Nome: ____________________  Jogador: ____________________</p>
+      <p>Raça: __________  Classe: __________  Nível: ______  Antecedente: __________</p>
+      <h3>Atributos e Modificadores</h3>
+      <table><tr><th>FOR</th><th>DES</th><th>CON</th><th>INT</th><th>SAB</th><th>CAR</th></tr>
+      <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>Mod</td><td>Mod</td><td>Mod</td><td>Mod</td><td>Mod</td><td>Mod</td></tr></table>
+      <p>PV: ______  CA: ______  Deslocamento: ______  Bônus de Proficiência: ______</p>
+      <h3>Perícias Treinadas</h3><div class="linhas"></div>
+      <h3>Magias / Talentos</h3><div class="linhas grande"></div>
+      <h3>Equipamento e Inventário</h3><div class="linhas"></div>
+      <h3>História</h3><div class="linhas grande"></div>`;
+  } else {
+    corpo = `
+      <h1>Ficha Narrativa (FATE / Vampiro / similares)</h1>
+      <p>Nome: ____________________  Jogador: ____________________</p>
+      <p>Conceito: ______________________________________________</p>
+      <h3>Aspectos / Traços</h3><div class="linhas"></div>
+      <h3>Perícias / Habilidades</h3><div class="linhas"></div>
+      <h3>Recursos / Pontos de Destino / Willpower</h3>
+      <p>○ ○ ○ ○ ○ ○ ○ ○</p>
+      <h3>Relacionamentos</h3><div class="linhas"></div>
+      <h3>Notas e História</h3><div class="linhas grande"></div>`;
+  }
+
+  win.document.write(`
+    <html><head><title>Ficha em Branco</title>
+    <style>
+      body{font-family:Georgia,serif; padding:40px; max-width:800px; margin:auto; color:#222;}
+      h1{border-bottom:2px solid #444; padding-bottom:8px;}
+      h3{margin-top:22px; border-bottom:1px solid #999;}
+      table{border-collapse:collapse; width:100%; margin:10px 0;}
+      table td, table th{border:1px solid #444; padding:8px; text-align:center; width:16%; height:30px;}
+      .linhas{border-bottom:1px solid #999; height:26px; margin-top:14px;}
+      .linhas.grande{height:90px;}
+      p{margin:10px 0;}
+      @media print{ body{padding:10px;} }
+    </style></head>
+    <body>${corpo}
+    <p style="margin-top:30px; text-align:center; color:#777;">
+      <button onclick="window.print()">Imprimir / Salvar como PDF</button>
+    </p>
+    </body></html>
+  `);
+  win.document.close();
+}
+
+carregarTudo();
+</script>
+</body>
+</html>
