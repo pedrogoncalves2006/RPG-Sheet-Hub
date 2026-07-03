@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""
-Organizador de Fichas de RPG - servidor local
-- Não precisa instalar nada (só Python 3, que já vem em quase todo PC/Linux/Mac).
-- Roda na rede local: qualquer pessoa conectada no mesmo Wi-Fi/rede pode acessar
-  pelo endereço IP da máquina que está rodando o servidor.
-- Guarda tudo em arquivos simples dentro da pasta "data" (nada de banco de dados
-  complicado), então dá pra copiar/fazer backup só copiando a pasta.
-"""
-
 import json
 import mimetypes
 import os
